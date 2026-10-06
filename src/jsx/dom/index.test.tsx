@@ -2862,6 +2862,73 @@ describe('DOM', () => {
       expect(effectCount).toBe(2)
       expect(cleanupCount).toBe(1)
     })
+
+    it('does not re-run when dependency remains NaN', async () => {
+      let effectCount = 0
+      let cleanupCount = 0
+
+      const App = () => {
+        const [count, setCount] = useState(0)
+        const value = NaN
+        useEffect(() => {
+          effectCount++
+          return () => {
+            cleanupCount++
+          }
+        }, [value])
+        return (
+          <div>
+            <p>{count}</p>
+            <button onClick={() => setCount(count + 1)}>+</button>
+          </div>
+        )
+      }
+      const app = <App />
+      render(app, root)
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(effectCount).toBe(1)
+      expect(cleanupCount).toBe(0)
+      root.querySelectorAll('button')[0].click()
+      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(effectCount).toBe(1)
+      expect(cleanupCount).toBe(0)
+    })
+
+    it('re-runs when dependency changes from 0 to -0', async () => {
+      let effectCount = 0
+      let cleanupCount = 0
+      let lastTitle = ''
+
+      const App = () => {
+        const [value, setValue] = useState(0)
+        useEffect(() => {
+          effectCount++
+          lastTitle = String(1 / value)
+          return () => {
+            cleanupCount++
+          }
+        }, [value])
+        return (
+          <div>
+            <p>{Object.is(value, -0) ? '-0' : '0'}</p>
+            <button onClick={() => setValue(-0)}>set -0</button>
+          </div>
+        )
+      }
+      const app = <App />
+      render(app, root)
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(effectCount).toBe(1)
+      expect(cleanupCount).toBe(0)
+      expect(lastTitle).toBe('Infinity')
+      root.querySelectorAll('button')[0].click()
+      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve))
+      expect(effectCount).toBe(2)
+      expect(cleanupCount).toBe(1)
+      expect(lastTitle).toBe('-Infinity')
+    })
   })
 
   describe('useLayoutEffect', () => {
